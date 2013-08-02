@@ -1,0 +1,6 @@
+[submodule "contrib/agent"]
+	path = contrib/agent
+	url = https://github.com/yangacer/agent.git
+[submodule "contrib/json"]
+	path = contrib/json
+	url = https://github.com/yangacer/JSON-CC.git

@@ -1,0 +1,22 @@
+digraph magent_arch {
+  rankdir=LR
+  overlap=false
+  fontsize=12
+
+  node [ shape=box ]; getter; chunk_pool; peer_pool; magent; gri_odb;
+  gri_odb   -> magent     [ label="create" ];
+  magent    -> getter     [ label="create" ];
+  magent    -> chunk_pool [ label="create" ];
+  chunk_pool-> magent     [ label="notify_complete" ];
+  magent    -> peer_pool  [ label="create/refresh/query_peer" ];
+  peer_pool -> magent     [ label="peer_info" ];
+  getter    -> chunk_pool [ label="get/put/abort" ];
+  getter    -> magent     [ label="notify_failure_peer" ];
+  
+
+  magent    -> gri_odb    [ label="report" ];
+  gri_odb   -> magent     [ label="QoS" ];
+
+  magent    -> gri_odb    [ label="query_peer_segment" ];
+  gri_odb   -> magent     [ label="peer_segment_info" ];
+}
