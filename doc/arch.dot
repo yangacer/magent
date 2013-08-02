@@ -3,20 +3,23 @@ digraph magent_arch {
   overlap=false
   fontsize=12
 
-  node [ shape=box ]; getter; chunk_pool; peer_pool; magent; gri_odb;
-  gri_odb   -> magent     [ label="create" ];
-  magent    -> getter     [ label="create" ];
-  magent    -> chunk_pool [ label="create" ];
-  chunk_pool-> magent     [ label="notify_complete" ];
-  magent    -> peer_pool  [ label="create/refresh/query_peer" ];
-  peer_pool -> magent     [ label="peer_info" ];
-  getter    -> chunk_pool [ label="get/put/abort" ];
-  getter    -> magent     [ label="notify_failure_peer" ];
-  
+  node [ shape=box ]; gri_odb; magent; headget; dataget; chunk_pool; peer_pool;
+  gri_odb   -> magent     [ label="1. create(obj_desc)" ];
+  magent    -> peer_pool  [ label="2. create(obj_desc)" ];
+  magent    -> headget    [ label="[ 3. create(origin_peer) ]" ];
+  headget   -> magent     [ label="[ 4. notify_head ]", style="dashed" ];
+  magent    -> chunk_pool [ label="5. create(obj_desc)" ];
+  magent    -> dataget    [ label="6. create(peer)" ];
+  magent    -> chunk_pool [ label="7. get_chunk()", dir="both" ];
+  magent    -> chunk_pool [ label="8. put(chk)/abort(chk)", dir="both" ];
+  chunk_pool-> magent     [ label="9. get_complete()", dir="both" ];
+  magent    -> gri_odb    [ label="10. report", style="dashed" ];
+  gri_odb   -> magent     [ label="11. QoS", style="dashed" ];
 
-  magent    -> gri_odb    [ label="report" ];
-  gri_odb   -> magent     [ label="QoS" ];
+  dataget   -> magent     [ label="*9. notify_chunk", style="dashed" ];
+  magent    -> peer_pool  [ label="*10 get_peer(byte_offset, size) (goto 6 if success, otherwise *11)", dir="both" ];
 
-  magent    -> gri_odb    [ label="query_peer_segment" ];
-  gri_odb   -> magent     [ label="peer_segment_info" ];
+  magent    -> gri_odb    [ label="*11 query_peer_segment", style="dashed" ];
+  gri_odb   -> magent     [ label="*12 peer_segment_info", style="dashed" ];
+  magent    -> peer_pool  [ label="*13 refresh (goto 6)", dir="both" ]; 
 }

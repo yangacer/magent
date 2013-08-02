@@ -11,6 +11,13 @@
 
 namespace json = yangacer::json;
 
+class peer_pool
+{
+public:
+  peer_pool(json::var_t const& obj_desc);
+  http::entity::url get_peer(size_t seg_off=0);
+};
+
 class chunk_pool
 {
 public:
@@ -22,34 +29,42 @@ public:
 
   chunk_pool(json::var_t const &obj_desc);
   chunk get_chunk();
-  void put_chunk(chunk chk);
-  void abort_chunk(chunk chk);
+  void  put_chunk(chunk chk);
+  void  abort_chunk(chunk chk);
 private:
-  //odb_handle odb_handle_;
 };
 
-class getter
+
+class data_getter : agent_v2
 {
 public:
-  getter(boost::asio::io_service &ios, chunk_pool &cpool);
-private:
-  agent_v2 agent_;
+  data_getter(boost::asio::io_service &ios);
+  void async_get(/**/);
+protected:
+  void handle_request(/**/);
 };
 
 class magent
 {
+  typedef boost::shared_ptr<peer_pool>  peer_pool_ptr_type;
   typedef boost::shared_ptr<chunk_pool> chunk_pool_ptr_type;
-  typedef std::vector<boost::shared_ptr<getter> > getter_array_type;
+  typedef std::vector<boost::shared_ptr<data_getter> > data_getter_array_type;
 public:
   magent(int argc, char **argv);
   static int estimate_concurrency(json::var_t const &obj_desc);
   void run();
 protected:
+  void heading(http::entity::url const &url);
+  void handle_heading(/**/);
+  void configure_chunk_pool(json::var_t const &obj_desc);
+  void configure_peer_pool(json::var_t const &obj_desc);
+  
 private:
   boost::asio::io_service ios_;
   //io_service_pool service_pool_;
-  chunk_pool_ptr_type chunk_pool_ptr_;
-  getter_array_type getter_array_;
+  peer_pool_ptr_type      peer_pool_ptr_;
+  chunk_pool_ptr_type     chunk_pool_ptr_;
+  data_getter_array_type  data_getter_array_;
 };
 
 magent::magent(int argc, char**argv)
@@ -80,15 +95,13 @@ magent::magent(int argc, char**argv)
   if(!json::phrase_parse(beg, end, obj_desc)) 
     throw std::invalid_argument("Malformed obj-desc");
   
-  // TODO MOVE TO chunk_pool init
-  // auto content_length = mbof(obj_desc)["content_length"].test(0);
 
   int concurrency = estimate_concurrency(obj_desc);
 
   chunk_pool_ptr_.reset(new chunk_pool(obj_desc));
-  getter_array_.resize(concurrency);
-  for(auto i=getter_array_.begin(); i != getter_array_.end(); ++i)
-    i->reset(new getter(ios_, chunk_pool));
+  data_getter_array_.resize(concurrency);
+  for(auto i=data_getter_array_.begin(); i != data_getter_array_.end(); ++i)
+    i->reset(new data_getter(ios_));
 }
 
 void magent::run()
