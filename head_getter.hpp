@@ -15,7 +15,10 @@ public:
     > head_handler_type;
 
   head_getter(boost::asio::io_service &ios) : agent_v2(ios) {}
-  virtual void async_head(http::entity::url const &origin, head_handler_type handler) = 0;
+
+  virtual void async_head(json::var_t const &desc, 
+                          head_handler_type handler) = 0;
+  virtual ~head_getter(){}
 };
 
 #endif

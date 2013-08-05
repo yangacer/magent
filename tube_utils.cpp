@@ -1,6 +1,32 @@
 #include "tube_utils.hpp"
+#include <map>
+#include <algorithm>
+#include <cassert>
+#include <fstream>
+#include <sstream>
+#include <stdexcept>
+#include <boost/lexical_cast.hpp>
+#include "json/accessor.hpp"
 
 namespace tube {
+
+template<typename Iter>
+std::string get_value(
+  Iter& beg, Iter& end,
+  std::string &field, std::string const &delim)
+{ 
+  Iter i;
+  std::string rt;
+  i = std::find(beg, end, '=');
+  if( i != end) {
+    field.assign(beg, i);
+    beg = i + 1;
+    i = std::search(beg, end, delim.begin(), delim.end());
+    rt.assign(beg, i);
+    beg = (i != end) ? i + delim.size() : end ;
+  }
+  return rt;
+}
 
 bool get_link(boost::asio::const_buffer &buffer, 
               std::string const &target_itag, 
@@ -52,5 +78,60 @@ bool get_link(boost::asio::const_buffer &buffer,
   return false;
 }
 
+#include <cstdio>
+boost::intmax_t get_mp4_header_size(boost::asio::const_buffer front_data)
+{
+#define GET_ATOM_SIZE_(Byte, Size) \
+  { Size = 0; \
+    for(int i_=0; i_ < 4; ++i_) { \
+      Size <<= 8; \
+      Size |= Byte[i_]; \
+    } \
+  }
+  size_t size = boost::asio::buffer_size(front_data);
+  assert( size > 0x1c && 
+          "Have no sufficient front_data to determine head size of a mp4");
+  char const 
+    *raw = boost::asio::buffer_cast<char const*>(front_data),
+    *beg = raw;
+  size_t atom_size;
+  GET_ATOM_SIZE_(raw, atom_size);
+  raw += atom_size; // skip ftyp atom
+  GET_ATOM_SIZE_(raw, atom_size);
+  if(0 != strncmp(raw + 4, "moov", 4))
+    return 0;
+  return (raw - beg) + atom_size;
+}
+
+std::string find_itag(json::var_t const &desc)
+{
+  using namespace std;
+
+  static map<string, string> itag;
+  if(itag.empty()) {
+    // read from file
+    ifstream fin("tube.tag", ios::binary | ios::in);
+    if(!fin.is_open()) 
+      throw runtime_error("Unable to open tube.tag file");
+    string line;
+    string key, val;
+    while(getline(fin, line)) {
+      stringstream tokner(line);
+      tokner >> key >> val; // extract resolution, 3d
+      key += "." + val;
+      tokner >> val; // extract type
+      key += "." + val;
+      tokner >> val; // extract itag
+      itag[key] = val;
+    }
+  }
+  string key = cmbof(desc)["oid"].string();
+  auto pos = key.find(".");
+  if(pos == string::npos) 
+    return "";
+  key = key.substr(pos + 1);
+  auto iter = itag.find(key);
+  return iter == itag.end() ? "" : iter->second;
+}
 
 } // namespace tube_utils
