@@ -9,8 +9,7 @@
 #include <json/json.hpp>
 #include <agent/agent_v2.hpp>
 #include <agent/log.hpp>
-
-#include "tube_head_getter.hpp"
+#include "extloader.hpp"
 
 namespace json = yangacer::json;
 
@@ -54,56 +53,59 @@ class magent
   typedef std::vector<boost::shared_ptr<data_getter> > data_getter_array_type;
 public:
   magent(int argc, char **argv);
-  int estimate_concurrency();
   void run();
 protected:
   void heading();
   void handle_heading(boost::system::error_code const &ec, json::var_t const &head_info);
-  void configure_chunk_pool(json::var_t const &obj_desc);
-  void configure_peer_pool(json::var_t const &obj_desc);
+  int  estimate_concurrency() const;
+  void start_subagent();
+  void configure_peer_pool();
   
 private:
   boost::asio::io_service ios_;
+  extloader               extloader_;
   //io_service_pool service_pool_;
   json::var_t             obj_desc_;
   peer_pool_ptr_type      peer_pool_ptr_;
   chunk_pool_ptr_type     chunk_pool_ptr_;
   data_getter_array_type  data_getter_array_;
+  int                     max_connection_;
 };
 
 magent::magent(int argc, char**argv)
 {
+  using namespace std;
   namespace po = boost::program_options;
 
-  std::string obj_desc_str, gri_addr;
-  
+  string obj_desc_str, gri_addr;
+  vector<string> extensions;
   po::options_description opts("magent options");
+
   opts.add_options()
     ("help,h", "Print help message")
     ("version,v", "Version information")
-    ("obj-desc", po::value<std::string>(&obj_desc_str), "Object description")
-    ("gri", po::value<std::string>(&gri_addr), "gri address")
+    ("obj-desc", po::value<string>(&obj_desc_str), "Object description")
+    ("gri", po::value<string>(&gri_addr), "gri address")
+    ("extendsion,x", po::value<vector<string> >(&extensions), "Extension modules")
+    ("max-connection,c", po::value<int>(&max_connection_)->default_value(5), "Maximum number of connections")
     ;
-  po::variables_map vm;
-  po::store(po::parse_command_line(argc, argv, opts), vm);
-  po::notify(vm);
+  po::variables_map vm; po::store(po::parse_command_line(argc, argv, opts),
+                                  vm); po::notify(vm);
   
-  if(vm.count("help")) {
-    std::cout << opts << "\n";
-    return;
-  }
+  if(vm.count("help")) { cout << opts << "\n"; return; }
 
   if(obj_desc_str.empty())
-    throw std::invalid_argument("Miss obj-desc argument");
+    throw invalid_argument("Miss obj-desc argument");
   if(gri_addr.empty())
-    throw std::invalid_argument("Miss gri argument");
+    throw invalid_argument("Miss gri argument");
 
   // parse obj_desc
   auto beg(obj_desc_str.begin()), end(obj_desc_str.end());
   if(!json::phrase_parse(beg, end, obj_desc_)) 
-    throw std::invalid_argument("Malformed obj-desc");
+    throw invalid_argument("Malformed obj-desc");
   
-  mbof(obj_desc_)["content_length"].test(boost::intmax_t(0));
+  if(extensions.size())
+    extloader_.load(extensions);
 
   heading();
   // input: obj_desc(for extra info such as resolution, ..., etc.)
@@ -111,20 +113,26 @@ magent::magent(int argc, char**argv)
   /*
   int concurrency = estimate_concurrency(obj_desc);
 
-  chunk_pool_ptr_.reset(new chunk_pool(obj_desc));
-  data_getter_array_.resize(concurrency);
-  for(auto i=data_getter_array_.begin(); i != data_getter_array_.end(); ++i)
-    i->reset(new data_getter(ios_));
     */
 }
 
 void magent::heading()
 {
-  // TODO add factory here (according to oid ... or peer uri?)
-  head_getter_ptr_type head_getter_ptr(new tube_head_getter(ios_));
-  head_getter_ptr->async_head(
-    obj_desc_,
-    boost::bind(&magent::handle_heading, this, _1, _2));
+  auto content_length = 
+    mbof(obj_desc_)["content_length"].test(boost::intmax_t(0));
+
+  if(!content_length) {
+    assert(cmbof(obj_desc_)["sources"].object().size() == 1 && "multiple sources but no content length");
+    
+    std::string const &content_type = cmbof(obj_desc_)["content_type"].string();
+    std::string const &origin = cmbof(obj_desc_)["sources"].object().begin()->first;
+    
+    head_getter_ptr_type hg = extloader_.create_head_getter(ios_, content_type, origin);
+    if(hg)
+      hg->async_head(obj_desc_, boost::bind(&magent::handle_heading, this, _1, _2));
+  } else {
+    start_subagent();  
+  }
 }
 
 void magent::handle_heading(boost::system::error_code const &ec,
@@ -136,9 +144,26 @@ void magent::handle_heading(boost::system::error_code const &ec,
       cmbof(head_info).object().begin(), 
       cmbof(head_info).object().end());
     json::pretty_print(std::cout, obj_desc_);
+    start_subagent();
   } else {
     logger::instance().async_log("system_error", false, ec.message());
   }
+}
+
+int magent::estimate_concurrency() const
+{
+  return std::min(
+    cmbof(obj_desc_)["sources"].cast<int>(),
+    max_connection_)
+    ;
+}
+
+void magent::start_subagent()
+{
+  chunk_pool_ptr_.reset(new chunk_pool(obj_desc));
+  data_getter_array_.resize(estimate_concurrency());
+  //for(auto i=data_getter_array_.begin(); i != data_getter_array_.end(); ++i)
+  //  i->reset(new data_getter(ios_));
 }
 
 void magent::run()

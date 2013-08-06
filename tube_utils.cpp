@@ -125,12 +125,13 @@ std::string find_itag(json::var_t const &desc)
       itag[key] = val;
     }
   }
-  string key = cmbof(desc)["oid"].string();
-  auto pos = key.find(".");
-  if(pos == string::npos) 
-    return "";
-  key = key.substr(pos + 1);
-  auto iter = itag.find(key);
+  stringstream cvt;
+  cvt << 
+    cmbof(desc)["video"]["resolution"].intmax() << "." <<
+    cmbof(desc)["video"]["dimension"].string() << "." <<
+    cmbof(desc)["video"]["type"].string()
+    ;
+  auto iter = itag.find(cvt.str());
   return iter == itag.end() ? "" : iter->second;
 }
 

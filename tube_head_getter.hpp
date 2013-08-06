@@ -1,6 +1,7 @@
 #ifndef MAGENT_TUBE_HEAD_GETTER_HPP_
 #define MAGENT_TUBE_HEAD_GETTER_HPP_
 
+#include "extension.hpp"
 #include "head_getter.hpp"
 #include <string>
 #include <boost/enable_shared_from_this.hpp>

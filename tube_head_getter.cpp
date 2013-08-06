@@ -26,15 +26,10 @@ void tube_head_getter::async_head(json::var_t const &desc,
   http::request req;
   json::object_t const &sources = cmbof(desc)["sources"].object();
   
-  assert( !sources.empty() && "No sources" );
-  // TODO move this to magent
-  if(cmbof(desc)["content_length"].intmax() == 0) { // has only one source
-    origin = cmbof(desc)["sources"].object().begin()->first;
-  } else {
-    json::var_t dummy;
-    error_code ok;
-    io_service().post(boost::bind(handler, ok, dummy));
-  }
+  assert( 1 == sources.size() && "No heading is required" );
+
+  origin = cmbof(desc)["sources"].object().begin()->first;
+  
   http::get_header(req.headers, "Connection")->value = "close";
   async_request(origin, req, "GET", false,
                 boost::bind(&tube_head_getter::handle_page, shared_from_this(),
@@ -132,3 +127,23 @@ void tube_head_getter::handle_content_head(boost::system::error_code const &ec,
   } else {}
 }
 
+// ---- extension registration ----
+
+extern "C" int magent_ext_support_head(char const *content_type, char const *uri)
+{
+  if(strncmp(content_type, "video/", 6) == 0) 
+    content_type += 6;
+  else
+    return 0;
+
+  if(strncmp(content_type, "mp4",   3) != 0 &&
+     strncmp(content_type, "flv",   3) != 0 &&
+     strncmp(content_type, "webm",  4) != 0)
+    return 0;
+
+  if(strncmp(uri, "http://", 7) == 0)
+    uri += 7;
+  return strncmp(uri, "www.youtube.com", 15) == 0;
+}
+
+MAGENT_EXT_HEAD_GETTER_IMPL(tube_head_getter)
