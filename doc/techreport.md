@@ -92,6 +92,12 @@ Note: Tail segment may have size less than segment_size. To determine whether it
   oid : object_id,
   content_type : MIMETYPE,
   content_length : object_size_in_bytes (optional),
+  segment_map : [ 
+    { // Run length encoded concept
+      size : segement_size_in_bytes,
+      count : count_of_segement_of_the_same_size
+    }, ...
+  ],
   sources: description_of_sources // see below
 }
 ```
@@ -100,29 +106,13 @@ Note: Tail segment may have size less than segment_size. To determine whether it
 
 ```
 { 
-  peer_id : [ 
-    { offset : segment_offset, size : segment_size }, 
-    ... 
-  ],
-  peer_id : [ ... ],
+  peer_URI : [ segment_offset, ... ],
+  peer_URI : [ ... ],
   ...
 }
 ```
 
-Note: The agent internally translated the sources description as
-```
-[ 
-  {
-    offset : segment_offset, 
-    size : segment_size, 
-    peer : [peer_id, ... ]
-  }, 
-  {},
-  NULL,
-  ...
-]
-```
-Use NULL to indicate a missing segment.
+Note that peer_URI of **localhost** refers segments reside in localhost already and will not be fetched by the agent.
 
 ### Chunk size
 

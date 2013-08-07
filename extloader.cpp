@@ -55,6 +55,7 @@ extloader::create_head_getter(boost::asio::io_service &ios,
                               std::string const &content_type, 
                               std::string const &uri)
 {
+  // TODO Preload has_support function to reduce loading time.
   head_getter_ptr_type rt;
   for(auto i = extension_.begin(); i != extension_.end(); ++i) {
     auto has_support = ld_chk<has_getter_t>(i->second, SUP_HEAD_);

@@ -10,6 +10,7 @@
 #include <agent/agent_v2.hpp>
 #include <agent/log.hpp>
 #include "extloader.hpp"
+#include "chunk_pool.hpp"
 
 namespace json = yangacer::json;
 
@@ -17,23 +18,9 @@ class peer_pool
 {
 public:
   peer_pool(json::var_t const& obj_desc);
-  http::entity::url get_peer(size_t seg_off=0);
-};
-
-class chunk_pool
-{
-public:
-  struct chunk
-  {
-    boost::asio::mutable_buffer buffer;
-    boost::intmax_t offset;
-  };
-
-  chunk_pool(json::var_t const &obj_desc);
-  chunk get_chunk();
-  void  put_chunk(chunk chk);
-  void  abort_chunk(chunk chk);
-private:
+  //http::entity::url register_peer(chunk chk);
+  //void unregister_peer(http::entity::url const &url);
+  //void invalid_peer(http::entity::url const &url);
 };
 
 class data_getter : agent_v2
@@ -160,7 +147,13 @@ int magent::estimate_concurrency() const
 
 void magent::start_subagent()
 {
-  chunk_pool_ptr_.reset(new chunk_pool(obj_desc));
+  // The chunk_pool compute what data to be fetched in terms of chunk.
+  // Consecutive requests to a chunk_pool are reponsed with chunks of offsets
+  // ordered from small to large but may not be sequentially.
+  chunk_pool_ptr_.reset(new chunk_pool(obj_desc_));
+  // The peer_pool keeps record of which peers is being connected and offer
+  // interfaces to register/unregister/invalid peers.
+  // peer_pool_ptr_.reset(new peer_pool(obj_desc_));
   data_getter_array_.resize(estimate_concurrency());
   //for(auto i=data_getter_array_.begin(); i != data_getter_array_.end(); ++i)
   //  i->reset(new data_getter(ios_));
