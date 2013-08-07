@@ -85,7 +85,7 @@ boost::intmax_t get_mp4_header_size(boost::asio::const_buffer front_data)
   { Size = 0; \
     for(int i_=0; i_ < 4; ++i_) { \
       Size <<= 8; \
-      Size |= Byte[i_]; \
+      Size |= (unsigned char)Byte[i_]; \
     } \
   }
   size_t size = boost::asio::buffer_size(front_data);
@@ -94,13 +94,16 @@ boost::intmax_t get_mp4_header_size(boost::asio::const_buffer front_data)
   char const 
     *raw = boost::asio::buffer_cast<char const*>(front_data),
     *beg = raw;
-  size_t atom_size;
+  boost::uint32_t atom_size;
   GET_ATOM_SIZE_(raw, atom_size);
   raw += atom_size; // skip ftyp atom
   GET_ATOM_SIZE_(raw, atom_size);
   if(0 != strncmp(raw + 4, "moov", 4))
     return 0;
-  return (raw - beg) + atom_size;
+  // fprintf(stderr, "%x\n", atom_size);
+  atom_size += raw - beg;
+  // fprintf(stderr, "%x\n", atom_size);
+  return atom_size;
 }
 
 std::string find_itag(json::var_t const &desc)

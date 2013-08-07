@@ -105,10 +105,12 @@ magent::magent(int argc, char**argv)
 
 void magent::heading()
 {
-  auto content_length = 
-    mbof(obj_desc_)["content_length"].test(boost::intmax_t(0));
+  //auto content_length = 
+  //  mbof(obj_desc_)["content_length"].test(boost::intmax_t(0));
+  auto segment_map =
+    mbof(obj_desc_)["segment_map"].test(json::array_t());
 
-  if(!content_length) {
+  if(segment_map.empty()) {
     assert(cmbof(obj_desc_)["sources"].object().size() == 1 && "multiple sources but no content length");
     
     std::string const &content_type = cmbof(obj_desc_)["content_type"].string();

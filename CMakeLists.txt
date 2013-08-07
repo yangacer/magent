@@ -19,6 +19,6 @@ add_executable ( mage main.cpp )
 target_link_libraries ( mage magent)
 
 file (GLOB tube_ext_src extension/tube/*.cpp )
-add_library ( tube ${tube_ext_src} )
+add_library ( tube SHARED ${tube_ext_src} )
 target_link_libraries ( tube json agent ${Boost_LIBRARIES} pthread )
 
