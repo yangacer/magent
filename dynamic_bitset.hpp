@@ -68,9 +68,10 @@ public:
     block_width_type ind = bit_index(pos);
     Block fore = ~m_bits[blk] & (~Block(0) << ind);
 
-    return fore ?
+    size_type rt = fore ?
       blk * bits_per_block + boost::lowest_bit(fore) :
       m_do_find_off_from(blk + 1);
+    return rt >= super_::size() ? super_::npos : rt;
   }
 private:
   size_type m_do_find_off_from(size_type first_block) const

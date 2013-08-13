@@ -213,7 +213,7 @@ void magent::handle_data(boost::system::error_code const &ec,
                          std::string const &peer, 
                          chunk_pool::chunk chk)
 {
-  std::cout << *chunk_pool_ptr_ << "\n";
+  //std::cout << *chunk_pool_ptr_ << "\n";
   if(!ec) {
     chunk_pool_ptr_->put_chunk(peer, chk);
   } else {
@@ -222,7 +222,7 @@ void magent::handle_data(boost::system::error_code const &ec,
   if(chunk_pool_ptr_->is_complete()) {
     if(chunk_pool_ptr_->flush_then_next())
       dispatch_agent(peer);
-    std::cout << *chunk_pool_ptr_ << "\n";
+    // std::cout << *chunk_pool_ptr_ << "\n";
     // TODO report
     json::pretty_print(std::cout, obj_desc_);
   } else {
