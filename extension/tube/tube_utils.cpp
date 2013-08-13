@@ -138,4 +138,21 @@ std::string find_itag(json::var_t const &desc)
   return iter == itag.end() ? "" : iter->second;
 }
 
+int is_supported(char const *content_type, char const *uri)
+{
+  if(strncmp(content_type, "video/", 6) == 0) 
+    content_type += 6;
+  else
+    return 0;
+
+  if(strncmp(content_type, "mp4",   3) != 0 &&
+     strncmp(content_type, "flv",   3) != 0 &&
+     strncmp(content_type, "webm",  4) != 0)
+    return 0;
+
+  if(strncmp(uri, "http://", 7) == 0)
+    uri += 7;
+  return strncmp(uri, "www.youtube.com", 15) == 0;
+}
+
 } // namespace tube_utils

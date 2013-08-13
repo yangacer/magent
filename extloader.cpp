@@ -36,6 +36,7 @@ extloader::~extloader()
 #define SUP_HEAD_  "magent_ext_support_head"
 #define SUP_DATA_  "magent_ext_support_data"
 #define HEAD_CTOR_ "magent_ext_create_head_getter"
+#define DATA_CTOR_ "magent_ext_create_data_getter"
 
 /** Load symbol from extension handle and throw
  *  if any error occurs.
@@ -61,6 +62,24 @@ extloader::create_head_getter(boost::asio::io_service &ios,
     auto has_support = ld_chk<has_getter_t>(i->second, SUP_HEAD_);
     if( has_support(content_type.c_str(), uri.c_str()) ) {
       auto creator = ld_chk<head_getter_create_t>(i->second, HEAD_CTOR_);
+      rt = creator(&ios); 
+      break;
+    }
+  }
+  return rt;
+}
+
+extloader::data_getter_ptr_type 
+extloader::create_data_getter(boost::asio::io_service &ios, 
+                              std::string const &content_type, 
+                              std::string const &uri)
+{
+  // TODO Preload has_support function to reduce loading time.
+  data_getter_ptr_type rt;
+  for(auto i = extension_.begin(); i != extension_.end(); ++i) {
+    auto has_support = ld_chk<has_getter_t>(i->second, SUP_DATA_);
+    if( has_support(content_type.c_str(), uri.c_str()) ) {
+      auto creator = ld_chk<data_getter_create_t>(i->second, DATA_CTOR_);
       rt = creator(&ios); 
       break;
     }

@@ -9,6 +9,7 @@
 #include <boost/asio/io_service.hpp>
 #include "extension.hpp"
 #include "head_getter.hpp"
+#include "data_getter.hpp"
 
 struct extloader_error : std::exception
 {
@@ -24,11 +25,16 @@ class extloader
   typedef void* ext_handle_type;
 public:
   typedef boost::shared_ptr<head_getter> head_getter_ptr_type;
+  typedef boost::shared_ptr<data_getter> data_getter_ptr_type;
   extloader();
   void load(std::string const &extension);
   void load(std::vector<std::string> const &ext_list);
   ~extloader();
   head_getter_ptr_type create_head_getter(
+    boost::asio::io_service &ios,
+    std::string const &content_type, 
+    std::string const &uri);
+  data_getter_ptr_type create_data_getter(
     boost::asio::io_service &ios,
     std::string const &content_type, 
     std::string const &uri);

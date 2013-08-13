@@ -2,7 +2,7 @@ cmake_minimum_required (VERSION 2.8)
 project ( magent )
 
 include ( contrib/agent/cmake_mod/use_c++11.cmake )
-find_package( Boost REQUIRED program_options thread system)
+find_package( Boost REQUIRED program_options thread system filesystem)
 
 include_directories ( contrib/json
                       contrib/agent

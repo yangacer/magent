@@ -5,6 +5,7 @@
 #include "head_getter.hpp"
 #include <string>
 #include <boost/enable_shared_from_this.hpp>
+#include <agent/agent_v2.hpp>
 
 /** \brief Head getter for tube service.
  * 
@@ -16,7 +17,7 @@
  * @codebeg
  * {
  *  content_length : video_size,
- *  min_segment_size : segguestion_for_minimum_segment_size (0 as unknown)
+ *  first_segment_size : segguestion_for_first_segment_size (0 as unknown)
  * }
  * @endcode
  * 
@@ -24,6 +25,7 @@
  */
 class tube_head_getter
 : public head_getter,
+  public agent_v2,
   public boost::enable_shared_from_this<tube_head_getter>
 {
 public:

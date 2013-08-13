@@ -8,7 +8,7 @@
 #include "tube_utils.hpp"
 
 tube_head_getter::tube_head_getter(boost::asio::io_service &ios)
-: head_getter(ios)
+: agent_v2(ios)
 {}
 
 void tube_head_getter::async_head(json::var_t const &desc, 
@@ -119,7 +119,7 @@ void tube_head_getter::handle_content_head(boost::system::error_code const &ec,
         mbof(rt)["content_length"].value(content_length);
       }
     }
-    mbof(rt)["min_segment_size"].value(tube::get_mp4_header_size(buffer));
+    mbof(rt)["header_size"].value(tube::get_mp4_header_size(buffer));
     boost::system::error_code ok;
     io_service().post(boost::bind(handler, ok, rt));
   } else if(ec) {
@@ -131,19 +131,7 @@ void tube_head_getter::handle_content_head(boost::system::error_code const &ec,
 
 extern "C" int magent_ext_support_head(char const *content_type, char const *uri)
 {
-  if(strncmp(content_type, "video/", 6) == 0) 
-    content_type += 6;
-  else
-    return 0;
-
-  if(strncmp(content_type, "mp4",   3) != 0 &&
-     strncmp(content_type, "flv",   3) != 0 &&
-     strncmp(content_type, "webm",  4) != 0)
-    return 0;
-
-  if(strncmp(uri, "http://", 7) == 0)
-    uri += 7;
-  return strncmp(uri, "www.youtube.com", 15) == 0;
+  return tube::is_supported(content_type, uri);
 }
 
 MAGENT_EXT_HEAD_GETTER_IMPL(tube_head_getter)

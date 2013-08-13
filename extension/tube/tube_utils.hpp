@@ -32,5 +32,7 @@ boost::intmax_t get_mp4_header_size(boost::asio::const_buffer front_data);
  */
 std::string find_itag(json::var_t const &desc);
 
+int is_supported(char const *content_type, char const *uri);
+
 } // namespace tube
 #endif
