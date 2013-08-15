@@ -29,16 +29,19 @@ The agent **MUST NOT** connects to the same peer over a session. Peer informatio
 
 The agent reports its status, i.e. data fetched, to GRI via HTTP POST. The agent **MUST** reports either complete segments or empty segments but **NOT** semi-segments. Format of status is the same with [object description](#Object.Description)
 
-### QoS
+### Recognizable response of Stat
 
-When the agent reports its status, a GRI can feedback a QoS message of following format:
+When the agent reports its status, messages recognized by the agent are as follows:
 
 ```
 {
-  QoS_description : "description" // foreground | background
+  qos : download_speed_in_bytes_per_second,
+  sources : source_description
 }
 ```
-    
+
+See setion ["Source Description"](#Source.Description).
+
 ### Timeout handling
  
 Agent always retries to complete an object even timeout occurs. Retrying includes to reconnecting available peers and re-querying GRI(local GRI). The agent only aborts when retrying count exceeds given limit. On the other hand, clients wait for streaming agent's result can timeout whenever they want.
@@ -53,23 +56,14 @@ Segment size **MUST** be greater or equal to system's page size. It **SHOULD** n
 
 Current policy:
 
-```
-assert( content_length > 0 );
-if( content_length < 16mb ) 
-  segment_size = 1mb;
-else if(content_length < 128mb) 
-  segment_size = 2mb;
-else 
-  segment_size = 4mb;
-```
-
-Note: Tail segment may have size less than segment_size. To determine whether it is complete or not, content_length is required.
+Head getter of extensions will determine size of the first segment in the perception of its target. Following segments are of size 8 Mbytes. A last segment may less than 8 Mbytes.
  
 ### Object Description
 
 ```
 {
   oid : object_id,
+  attribute : attribute_object,
   content_type : MIMETYPE,
   content_length : object_size_in_bytes (optional),
   localhost : segment_mask (or null) 
@@ -80,9 +74,23 @@ Note: Tail segment may have size less than segment_size. To determine whether it
       digest : SHA1_digets_of_a_segment
     }, ...
   ],
-  sources: sources_description // see below
+  sources: sources_description 
 }
 ```
+
+### Attribute Object
+
+Attribute object describes extra attributes about an object. For example, a youtube URI http://www.youtube.com/watch?v=some_id can provides several videos of different formats. One **MUST** specifies attributes that can uniqually identify one of those videos. e.g.
+
+```
+{ // attribute_object
+  type : "mp4",
+  dimension : "2d",
+  resolution : "1080"
+}
+```
+
+Extensions may depend on this extra description to resolve ambiguity.
 
 ### Sources Description
 

@@ -8,6 +8,8 @@
 #include <boost/program_options.hpp>
 #include <json/json.hpp>
 #include <agent/agent_v2.hpp>
+#include <agent/quality_config.hpp>
+#include <agent/placeholders.hpp>
 #include <agent/log.hpp>
 #include "extloader.hpp"
 #include "chunk_pool.hpp"
@@ -30,7 +32,14 @@ protected:
   int  estimate_concurrency() const;
   void generate_segment_map(json::var_t const &head_info);
   void check_and_init_origin();
-  void prepare_subagent();
+  void prepare();
+  void heart_beat(bool persistent = true);
+  void handle_heart_beat(boost::system::error_code const &ec, 
+                         http::response const &resp,
+                         boost::asio::const_buffer buffer,
+                         boost::shared_ptr<std::string> body,
+                         boost::shared_ptr<agent_v2>,
+                         bool persistent);
   void dispatch_agent(std::string peer = "");
   void handle_data(boost::system::error_code const &ec, 
                    std::string const &peer, 
@@ -108,7 +117,7 @@ void magent::heading()
     else
       logger::instance().async_log("warning", false, "No supported head getter found");
   } else {
-    prepare_subagent();  
+    prepare();  
   }
 }
 
@@ -118,14 +127,13 @@ void magent::handle_heading(boost::system::error_code const &ec,
   if(!ec) {
     generate_segment_map(head_info);
     check_and_init_origin();
-    prepare_subagent();
+    prepare();
   } else {
     logger::instance().async_log("system_error", false, ec.message());
   }
 }
 
-#define ALIGN_(X, Base) \
-  ((X + ((Base)-1)) & ~((Base)-1))
+#define ALIGN_(X, Base) ((X + ((Base)-1)) & ~((Base)-1))
 
 void magent::generate_segment_map(json::var_t const &head_info)
 {
@@ -178,7 +186,7 @@ void magent::check_and_init_origin()
   }
 }
 
-void magent::prepare_subagent()
+void magent::prepare()
 {
   // The chunk_pool compute what data to be fetched in terms of chunk.
   // Consecutive requests to a chunk_pool are reponsed with chunks of offsets
@@ -190,10 +198,60 @@ void magent::prepare_subagent()
     ;
   auto concurrency = chunk_pool_ptr_->estimate_concurrency();
   mbof(obj_desc_)["debug"]["concurrency"] = (boost::intmax_t)concurrency;
+  mbof(obj_desc_)["qos"] = (boost::intmax_t)0;
+  heart_beat();
   dispatch_agent();
 }
 
-#include <iostream>
+void magent::heart_beat(bool persistent)
+{
+  using namespace std;
+  boost::shared_ptr<agent_v2> ha(new agent_v2(ios_));
+  boost::shared_ptr<std::string> body(new string);
+  http::entity::url url(vm_["gri"].as<string>());
+  std::stringstream cvt;
+
+  json::pretty_print(cvt, obj_desc_, json::print::compact);
+  cvt.flush();
+  url.query.query_map.insert(make_pair(string("stat"), cvt.str()));
+  ha->async_request(url, http::request(), "GET", true, 
+                    boost::bind(&magent::handle_heart_beat, this,
+                                agent_arg::error,
+                                agent_arg::response,
+                                agent_arg::buffer,
+                                body,
+                                ha,
+                                persistent));
+
+}
+
+void magent::handle_heart_beat(boost::system::error_code const &ec, 
+                               http::response const &resp,
+                               boost::asio::const_buffer buffer,
+                               boost::shared_ptr<std::string> body,
+                               boost::shared_ptr<agent_v2>,
+                               bool persistent)
+{
+  body->append(boost::asio::buffer_cast<char const*>(buffer), 
+               boost::asio::buffer_size(buffer));
+  if(ec == boost::asio::error::eof ) {
+    auto beg(body->begin()), end(body->end());
+    json::var_t v;
+    if(json::phrase_parse(beg, end, v)) {
+      if(cmbof(v)["qos"]) 
+        mbof(obj_desc_)["qos"] = cmbof(v)["qos"].var();
+      if(cmbof(v)["sources"])
+        mbof(obj_desc_)["sources"] = cmbof(v)["sources"].var();
+    }
+    json::pretty_print(std::cout, obj_desc_); //, json::print::compact);
+    if( persistent ) heart_beat(persistent);
+  } else if(!ec) {
+  } else {
+    logger::instance().async_log("error", false, ec.message());
+    if( persistent ) heart_beat(persistent);
+  }
+}
+
 void magent::dispatch_agent(std::string peer)
 {
   auto sources = cmbof(obj_desc_)["sources"].object();
@@ -203,8 +261,6 @@ void magent::dispatch_agent(std::string peer)
   {
     std::string const &content_type = cmbof(obj_desc_)["content_type"].string();
     chunk chk = chunk_pool_ptr_->get_chunk(peer);
-    std::cout << chk.offset << "-" << 
-      boost::asio::buffer_size(chk.buffer) << "\n";
     if(!chk) break;
     data_getter_ptr_type dg =
       extloader_.create_data_getter(ios_, content_type.c_str(), peer);
@@ -222,7 +278,6 @@ void magent::handle_data(boost::system::error_code const &ec,
                          std::string const &peer, 
                          chunk_pool::chunk chk)
 {
-  // std::cout << *chunk_pool_ptr_ << "\n";
   if(!ec) {
     chunk_pool_ptr_->put_chunk(peer, chk);
   } else {
@@ -235,12 +290,16 @@ void magent::handle_data(boost::system::error_code const &ec,
     }
   }
   if(chunk_pool_ptr_->is_complete()) {
+    heart_beat(false);
     if(chunk_pool_ptr_->flush_then_next())
       dispatch_agent(peer);
+    else
+      ios_.stop();
+    json::pretty_print(std::cout, obj_desc_); //, json::print::compact);
   } else {
     dispatch_agent(peer);
   }
-  json::pretty_print(std::cout, obj_desc_, json::print::compact);
+  //std::cout << std::endl;
 }
 
 void magent::run()
@@ -251,7 +310,10 @@ void magent::run()
 int main(int argc, char** argv)
 {
   try {
-    logger::instance().use_file("magent.log");
+    std::stringstream cvt;
+    cvt << "magent-" << getpid() << ".log";
+    cvt.flush();
+    logger::instance().use_file(cvt.str().c_str());
     magent ma(argc, argv);
     ma.run();
   } catch( std::exception &e) {

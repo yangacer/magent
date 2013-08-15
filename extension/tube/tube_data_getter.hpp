@@ -24,17 +24,19 @@ private:
                    boost::asio::const_buffer buffer,
                    data_handler_type handler,
                    json::var_t const &desc);
+
   void get_video(data_handler_type handler, json::var_t const &desc);
+
   void handle_content(boost::system::error_code const &ec,
-                      http::request const &req,
                       http::response const &resp,
                       boost::asio::const_buffer buffer,
+                      quality_config &qos,
                       data_handler_type handler,
-                      json::var_t const &desc,
-                      size_t buffer_consumed);
+                      json::var_t const &desc);
   std::string page_url_;
   http::entity::url video_url_;
   chunk_pool::chunk chunk_;
+  size_t buffer_consumed_;
 };
 
 #endif

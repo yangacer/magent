@@ -3,10 +3,11 @@
 #include <boost/bind.hpp>
 #include <agent/placeholders.hpp>
 #include <agent/parser.hpp>
+#include <json/accessor.hpp>
 #include "tube_utils.hpp"
 
 tube_data_getter::tube_data_getter(boost::asio::io_service &ios)
-: agent_v2(ios)
+: agent_v2(ios), buffer_consumed_(0)
 {}
 
 void tube_data_getter::async_get(json::var_t const &desc, 
@@ -23,7 +24,6 @@ void tube_data_getter::async_get(json::var_t const &desc,
     return;
   }
   */
-  // TODO do get content if peer == page_url_
   chunk_ = chk;
   if( peer == page_url_ ) {
     get_video(handler, desc);
@@ -40,7 +40,7 @@ void tube_data_getter::async_get(json::var_t const &desc,
                     agent_arg::response,
                     agent_arg::buffer, 
                     handler,
-                    desc));
+                    boost::cref(desc)));
   }
 }
 
@@ -96,33 +96,34 @@ void tube_data_getter::get_video(data_handler_type handler, json::var_t const &d
     chunk_.offset << "-" << 
     (chunk_.offset + bufsize -1)
     ;
-  req.headers << field("Range", cvt.str()); //<< field("Connection", "close");
-  async_request(video_url_, req, "GET", false,
+  req.headers << field("Range", cvt.str());
+  async_request(video_url_, req, "GET", true,
                 boost::bind(
                   &tube_data_getter::handle_content, shared_from_this(), 
                   agent_arg::error,
-                  agent_arg::request,
                   agent_arg::response,
                   agent_arg::buffer,
+                  agent_arg::qos,
                   handler,
-                  desc,
-                  0));
+                  boost::cref(desc)));
 }
 
 void tube_data_getter::handle_content(boost::system::error_code const &ec,
-                                      http::request const &req,
                                       http::response const &resp,
                                       boost::asio::const_buffer buffer,
+                                      quality_config &qos,
                                       data_handler_type handler,
-                                      json::var_t const &desc,
-                                      size_t buffer_consumed)
+                                      json::var_t const &desc)
 {
   using boost::lexical_cast;
   using boost::asio::buffer_copy;
   using boost::asio::buffer_size;
-  if(!ec || boost::asio::error::eof == ec) {
-    buffer_consumed += buffer_copy(chunk_.buffer + buffer_consumed, buffer);
-    if(buffer_consumed == buffer_size(chunk_.buffer)) {
+  auto speed = cmbof(desc)["qos"].intmax(); 
+  qos.read_max_bps = speed;
+  if((!ec || boost::asio::error::eof == ec) && resp.status_code - 200 < 100) {
+    buffer_consumed_ += buffer_copy(chunk_.buffer + buffer_consumed_, buffer);
+    if(boost::asio::error::eof == ec ) {
+      assert(buffer_consumed_ == buffer_size(chunk_.buffer));
       boost::system::error_code ok;
       io_service().post(boost::bind(handler, ok, page_url_, chunk_));
       assert( boost::asio::error::eof == ec );

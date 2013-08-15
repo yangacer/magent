@@ -130,9 +130,9 @@ std::string find_itag(json::var_t const &desc)
   }
   stringstream cvt;
   cvt << 
-    cmbof(desc)["video"]["resolution"].intmax() << "." <<
-    cmbof(desc)["video"]["dimension"].string() << "." <<
-    cmbof(desc)["video"]["type"].string()
+    cmbof(desc)["attribute"]["resolution"].intmax() << "." <<
+    cmbof(desc)["attribute"]["dimension"].string() << "." <<
+    cmbof(desc)["attribute"]["type"].string()
     ;
   auto iter = itag.find(cvt.str());
   return iter == itag.end() ? "" : iter->second;
