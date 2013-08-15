@@ -34,13 +34,29 @@ public:
   chunk_pool(json::var_t &obj_desc,
              size_t max_conn = 0, 
              size_t max_conn_per_peer = 0);
-  chunk get_chunk(std::string &peer);
+  ~chunk_pool();
+  /** Get first neigher acquired nor committed chunk from a prefered peer.
+   *  
+   *  @param preferred_peer 
+   *  If the preferred peer contains a qualified chunk, this parameter is 
+   *  left untouched. Otherwise, chunk_pool will pick another peer and 
+   *  change this parameter.
+   *
+   *  @return A chunk.
+   */
+  chunk get_chunk(std::string &preferred_peer);
   void  put_chunk(std::string const &peer, chunk chk);
   void  abort_chunk(std::string const &peer, chunk chk);
+  
   size_t running_agent() const;
   size_t estimate_concurrency() const;
+  
   void set_connection_limit(size_t max_conn, size_t max_conn_per_peer);
+  //! Is current segment complete? 
   bool is_complete() const;
+  /** Flush data of current segment and advance to next segment.
+   *  @return True if above two operations success, otherwise false.
+   */
   bool flush_then_next();
   static size_t chunk_size();
 #ifndef NDEBUG

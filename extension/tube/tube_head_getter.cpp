@@ -129,9 +129,5 @@ void tube_head_getter::handle_content_head(boost::system::error_code const &ec,
 
 // ---- extension registration ----
 
-extern "C" int magent_ext_support_head(char const *content_type, char const *uri)
-{
-  return tube::is_supported(content_type, uri);
-}
+MAGENT_EXT_HEAD_GETTER_IMPL(tube_head_getter, tube::is_supported)
 
-MAGENT_EXT_HEAD_GETTER_IMPL(tube_head_getter)

@@ -51,30 +51,6 @@ bool tube_data_getter::validate_desc(json::var_t const &desc)
 }
 */
 
-void tube_data_getter::get_video(data_handler_type handler, json::var_t const &desc)
-{
-  using http::entity::field;
-  http::request req;
-  std::stringstream cvt;
-  auto bufsize = boost::asio::buffer_size(chunk_.buffer);
-  assert(bufsize > 0);
-  cvt << "bytes=" <<  
-    chunk_.offset << "-" << 
-    (chunk_.offset + bufsize -1)
-    ;
-  req.headers << field("Range", cvt.str()); //<< field("Connection", "close");
-  async_request(video_url_, req, "GET", false,
-                boost::bind(
-                  &tube_data_getter::handle_content, shared_from_this(), 
-                  agent_arg::error,
-                  agent_arg::request,
-                  agent_arg::response,
-                  agent_arg::buffer,
-                  handler,
-                  desc,
-                  0));
-}
-
 void tube_data_getter::handle_page(boost::system::error_code const &ec, 
                                    http::response const &resp, 
                                    boost::asio::const_buffer buffer,
@@ -109,6 +85,30 @@ void tube_data_getter::handle_page(boost::system::error_code const &ec,
   }
 }
 
+void tube_data_getter::get_video(data_handler_type handler, json::var_t const &desc)
+{
+  using http::entity::field;
+  http::request req;
+  std::stringstream cvt;
+  auto bufsize = boost::asio::buffer_size(chunk_.buffer);
+  assert(bufsize > 0);
+  cvt << "bytes=" <<  
+    chunk_.offset << "-" << 
+    (chunk_.offset + bufsize -1)
+    ;
+  req.headers << field("Range", cvt.str()); //<< field("Connection", "close");
+  async_request(video_url_, req, "GET", false,
+                boost::bind(
+                  &tube_data_getter::handle_content, shared_from_this(), 
+                  agent_arg::error,
+                  agent_arg::request,
+                  agent_arg::response,
+                  agent_arg::buffer,
+                  handler,
+                  desc,
+                  0));
+}
+
 void tube_data_getter::handle_content(boost::system::error_code const &ec,
                                       http::request const &req,
                                       http::response const &resp,
@@ -134,9 +134,5 @@ void tube_data_getter::handle_content(boost::system::error_code const &ec,
 
 // ---- extension registration ----
 
-extern "C" int magent_ext_support_data(char const *content_type, char const *uri)
-{
-  return tube::is_supported(content_type, uri);
-}
+MAGENT_EXT_DATA_GETTER_IMPL(tube_data_getter, tube::is_supported)
 
-MAGENT_EXT_DATA_GETTER_IMPL(tube_data_getter)

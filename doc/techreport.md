@@ -19,8 +19,7 @@ The agent queries GRI no mater source exists in local or not. An agent only know
 
 ### Segment order
     
-Data is downloaded from different sources in sequential order of segments. The agent does **best effort** to fetch data sequentially.
-Though, the final words is sadly affected by peer status.
+Data is downloaded from different sources in sequential order of segments. The agent does **best effort** to fetch data sequentially. Though, the final words is sadly affected by peer status.
 
 ### Peer order
 
@@ -28,26 +27,7 @@ The agent **MUST NOT** connects to the same peer over a session. Peer informatio
 
 ### Stat
 
-The agent reports its status, i.e. data fetched, to GRI via HTTP POST. The status is describe in granularity of segment. The agent **MUST** reports either complete segments or empty segments but **NOT** semi-segments. Format of status is as following:
-
-```
-{ // ???
-  oid : object_id,
-  content_length : content_length_in_byte,
-  segment : [ 
-    {
-      offset : segment_offset, 
-      size: segment_size, 
-      digest : segment_digest(SHA1) 
-    }, 
-    ... 
-  ],
-  failure_peer : [ peer_id, ... ]
-}
-```
-
-Note: The agent inspects the oid to figure out extra information. e.g. Given an oid 'xxxx.1080', the agent's will fetch video of 
-1080 resolution.
+The agent reports its status, i.e. data fetched, to GRI via HTTP POST. The agent **MUST** reports either complete segments or empty segments but **NOT** semi-segments. Format of status is the same with [object description](#Object.Description)
 
 ### QoS
 
@@ -85,34 +65,38 @@ else
 
 Note: Tail segment may have size less than segment_size. To determine whether it is complete or not, content_length is required.
  
-### Description format of objects:
+### Object Description
 
 ```
 {
   oid : object_id,
   content_type : MIMETYPE,
   content_length : object_size_in_bytes (optional),
+  localhost : segment_mask (or null) 
   segment_map : [ 
     { // Run length encoded concept
       size : segement_size_in_bytes,
-      count : count_of_segement_of_the_same_size
+      count : count_of_segement_of_the_same_size,
+      digest : SHA1_digets_of_a_segment
     }, ...
   ],
-  sources: description_of_sources // see below
+  sources: sources_description // see below
 }
 ```
 
-### Description format of sources:
+### Sources Description
 
 ```
 { 
-  peer_URI : [ segment_offset, ... ],
-  peer_URI : [ ... ],
+  peer_URI : segment_mask
+  peer_URI : segment_mask,
   ...
 }
 ```
 
-Note that peer_URI of **localhost** refers segments reside in localhost already and will not be fetched by the agent.
+### Segment Mask
+
+The agent (and GRI) uses bit mask string to indicate which segment is complete. The right most 0 or 1 is the **first** segment, vice versa. e.g. "0001" indicates the **first** segment is complete and there are four segments in total. 
 
 ### Chunk size
 

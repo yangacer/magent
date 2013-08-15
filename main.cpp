@@ -42,7 +42,6 @@ private:
   //io_service_pool service_pool_;
   json::var_t             obj_desc_;
   chunk_pool_ptr_type     chunk_pool_ptr_;
-  //data_getter_array_type  data_getter_array_;
 };
 
 magent::magent(int argc, char**argv)
@@ -60,8 +59,15 @@ magent::magent(int argc, char**argv)
     ("obj-desc", po::value<string>(&obj_desc_str), "Object description")
     ("gri", po::value<string>(&gri_addr), "gri address")
     ("extendsion,x", po::value<vector<string> >(&extensions), "Extension modules")
-    ("max-connection,c", po::value<size_t>()->composing(), "Maximum number of connections")
-    ("max-conn-per-peer,C", po::value<size_t>()->composing(), "Maxiumum number of connections per peer")
+    ("max-connection,c", 
+     po::value<size_t>()->default_value(10)->composing(),
+     "Maximum number of connections")
+    ("max-conn-per-peer,C", 
+     po::value<size_t>()->default_value(3)->composing(),
+     "Maxiumum number of connections per peer")
+    ("retry-limit,r", 
+     po::value<boost::intmax_t>()->default_value(3)->composing(),
+     "Retry limit (per peer)")
     ;
   po::store(po::parse_command_line(argc, argv, opts), vm_); 
   po::notify(vm_);
@@ -86,8 +92,6 @@ magent::magent(int argc, char**argv)
 
 void magent::heading()
 {
-  //auto content_length = 
-  //  mbof(obj_desc_)["content_length"].test(boost::intmax_t(0));
   auto &segment_map =
     mbof(obj_desc_)["segment_map"].test(json::array_t());
 
@@ -101,6 +105,8 @@ void magent::heading()
     head_getter_ptr_type hg = extloader_.create_head_getter(ios_, content_type, origin);
     if(hg)
       hg->async_head(obj_desc_, boost::bind(&magent::handle_heading, this, _1, _2));
+    else
+      logger::instance().async_log("warning", false, "No supported head getter found");
   } else {
     prepare_subagent();  
   }
@@ -185,9 +191,9 @@ void magent::prepare_subagent()
   auto concurrency = chunk_pool_ptr_->estimate_concurrency();
   mbof(obj_desc_)["debug"]["concurrency"] = (boost::intmax_t)concurrency;
   dispatch_agent();
-
 }
 
+#include <iostream>
 void magent::dispatch_agent(std::string peer)
 {
   auto sources = cmbof(obj_desc_)["sources"].object();
@@ -197,6 +203,8 @@ void magent::dispatch_agent(std::string peer)
   {
     std::string const &content_type = cmbof(obj_desc_)["content_type"].string();
     chunk chk = chunk_pool_ptr_->get_chunk(peer);
+    std::cout << chk.offset << "-" << 
+      boost::asio::buffer_size(chk.buffer) << "\n";
     if(!chk) break;
     data_getter_ptr_type dg =
       extloader_.create_data_getter(ios_, content_type.c_str(), peer);
@@ -205,6 +213,7 @@ void magent::dispatch_agent(std::string peer)
                     boost::bind(&magent::handle_data, this, _1, _2, _3));
     } else {
       chunk_pool_ptr_->abort_chunk(peer, chk);
+      logger::instance().async_log("warning", false, "No supported head getter found");
     }
   }
 }
@@ -213,21 +222,25 @@ void magent::handle_data(boost::system::error_code const &ec,
                          std::string const &peer, 
                          chunk_pool::chunk chk)
 {
-  //std::cout << *chunk_pool_ptr_ << "\n";
+  // std::cout << *chunk_pool_ptr_ << "\n";
   if(!ec) {
     chunk_pool_ptr_->put_chunk(peer, chk);
   } else {
     chunk_pool_ptr_->abort_chunk(peer, chk);
+    auto &failure_cnt = 
+      mbof(obj_desc_)["peer_failure"][peer.c_str()].test(boost::intmax_t(0));
+    failure_cnt++;
+    if(failure_cnt > vm_["retry-limit"].as<boost::intmax_t>()) {
+      mbof(obj_desc_)["sources"].object().erase(peer);
+    }
   }
   if(chunk_pool_ptr_->is_complete()) {
     if(chunk_pool_ptr_->flush_then_next())
       dispatch_agent(peer);
-    // std::cout << *chunk_pool_ptr_ << "\n";
-    // TODO report
-    json::pretty_print(std::cout, obj_desc_);
   } else {
     dispatch_agent(peer);
   }
+  json::pretty_print(std::cout, obj_desc_, json::print::compact);
 }
 
 void magent::run()

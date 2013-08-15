@@ -48,6 +48,9 @@ chunk_pool::chunk_pool(
     running_cnt_[i->first] = 0;
 }
 
+chunk_pool::~chunk_pool()
+{}
+
 bool chunk_pool::acquire_peer(std::string &peer)
 {
   if(running_agent_ > max_connection_)
@@ -111,15 +114,16 @@ chunk_pool::chunk chunk_pool::get_chunk(std::string &peer)
 
   if(!seg_mapped_[cur_seg_]) {
     assert(seg_size > 0);
-    mr_ = ipc::mapped_region(mf_, ipc::read_write, seg_size);
+    mr_ = ipc::mapped_region(mf_, ipc::read_write, seg_offset, seg_size);
     seg_mapped_.set(cur_seg_);
-    auto chk_num = seg_size/chunk_pool::chunk_size();
-    chk_num = (chk_num == 0) ? 1 : chk_num;
+    auto chk_num = seg_size / chunk_pool::chunk_size();
+    chk_num += (seg_size % chunk_pool::chunk_size()) ? 1 : 0;
     chk_acquired_.resize(chk_num);
     chk_acquired_.reset();
     chk_committed_.resize(chk_num);
     chk_committed_.reset();
   }
+  // determine which chunk to get
   bitset_t::size_type pos = chk_committed_.find_first(false);
   while( bitset_t::npos != pos &&
          chk_acquired_[pos] == true &&
@@ -212,10 +216,12 @@ bool chunk_pool::is_complete() const
 
 bool chunk_pool::flush_then_next() 
 {
+  if(!mr_.flush(0, mr_.get_size(), false))
+    return false;
+
   seg_stored_[cur_seg_] = true;
   seg_mapped_[cur_seg_] = false;
   boost::to_string(seg_stored_, mbof(obj_desc_)["localhost"].string());
-  mr_.flush();
   cur_seg_ = seg_stored_.find_next(cur_seg_, false);
   return  cur_seg_ != bitset_t::npos;
 }

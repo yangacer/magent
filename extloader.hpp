@@ -22,8 +22,13 @@ private:
 
 class extloader
 {
-  typedef void* ext_handle_type;
 public:
+  struct ext_symbols
+  {
+    void * ext_handle;
+    head_getter_create_t *create_head_getter;
+    data_getter_create_t *create_data_getter;
+  };
   typedef boost::shared_ptr<head_getter> head_getter_ptr_type;
   typedef boost::shared_ptr<data_getter> data_getter_ptr_type;
   extloader();
@@ -39,7 +44,7 @@ public:
     std::string const &content_type, 
     std::string const &uri);
 private:
-  std::map<std::string, ext_handle_type> extension_;
+  std::map<std::string, ext_symbols> extension_v2_;
 };
 
 #endif
