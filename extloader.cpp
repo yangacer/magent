@@ -1,6 +1,7 @@
 #include "extloader.hpp"
 #include <stdexcept>
 #include <dlfcn.h>
+#include <cstdio>
 
 // --- extloader_error impl ----
 
@@ -27,8 +28,18 @@ T* ld_chk(void *exthandle, char const* symbol, T*&out)
   return out;
 }
 
-extloader::extloader()
-{}
+extloader::extloader() {}
+
+void extloader::set_generic(std::string const &extension)
+{
+  if(generic_.ext_handle) {
+    dlclose(generic_.ext_handle);
+    std::memset(&generic_, 0, sizeof(ext_symbols)); 
+  }
+  load(extension);
+  generic_ = extension_v2_[extension];
+  extension_v2_.erase(extension);
+}
 
 void extloader::load(std::string const &ext)
 {
@@ -68,6 +79,8 @@ extloader::create_head_getter(boost::asio::io_service &ios,
     rt = es.create_head_getter(&ios, content_type.c_str(), uri.c_str());
     if( rt ) break;
   }
+  if(!rt && generic_.ext_handle) 
+    rt = generic_.create_head_getter(&ios, content_type.c_str(), uri.c_str());
   return rt;
 }
 
@@ -82,5 +95,7 @@ extloader::create_data_getter(boost::asio::io_service &ios,
     rt = es.create_data_getter(&ios, content_type.c_str(), uri.c_str());
     if(rt)  break;
   }
+  if(!rt && generic_.ext_handle) 
+    rt = generic_.create_data_getter(&ios, content_type.c_str(), uri.c_str());
   return rt;
 }

@@ -32,6 +32,7 @@ public:
   typedef boost::shared_ptr<head_getter> head_getter_ptr_type;
   typedef boost::shared_ptr<data_getter> data_getter_ptr_type;
   extloader();
+  void set_generic(std::string const &extension);
   void load(std::string const &extension);
   void load(std::vector<std::string> const &ext_list);
   ~extloader();
@@ -45,6 +46,7 @@ public:
     std::string const &uri);
 private:
   std::map<std::string, ext_symbols> extension_v2_;
+  ext_symbols generic_;
 };
 
 #endif

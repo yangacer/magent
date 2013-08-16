@@ -58,7 +58,7 @@ magent::magent(int argc, char**argv)
   using namespace std;
   namespace po = boost::program_options;
 
-  string obj_desc_str, gri_addr;
+  string obj_desc_str, gri_addr, generic_getter;
   vector<string> extensions;
   po::options_description opts("magent options");
 
@@ -68,6 +68,7 @@ magent::magent(int argc, char**argv)
     ("obj-desc", po::value<string>(&obj_desc_str), "Object description")
     ("gri", po::value<string>(&gri_addr), "gri address")
     ("extendsion,x", po::value<vector<string> >(&extensions), "Extension modules")
+    ("generic-getter,g", po::value<string>(&generic_getter), "Generic getter module")
     ("max-connection,c", 
      po::value<size_t>()->default_value(10)->composing(),
      "Maximum number of connections")
@@ -95,7 +96,8 @@ magent::magent(int argc, char**argv)
   
   if(extensions.size())
     extloader_.load(extensions);
-
+  if(generic_getter.size())
+    extloader_.set_generic(generic_getter);
   heading();
 }
 

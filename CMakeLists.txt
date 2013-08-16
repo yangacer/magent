@@ -19,10 +19,15 @@ add_subdirectory ( tests )
 
 add_library ( magent  extloader.cpp chunk_pool.cpp )
 target_link_libraries ( magent dl json agent ${Boost_LIBRARIES} pthread )
+
 add_executable ( mage main.cpp )
 target_link_libraries ( mage magent )
 
 file (GLOB tube_ext_src extension/tube/*.cpp )
 add_library ( tube SHARED ${tube_ext_src} )
 target_link_libraries ( tube json agent ${Boost_LIBRARIES} pthread )
+
+file (GLOB generic_ext_src extension/generic/*.cpp )
+add_library ( generic SHARED ${generic_ext_src} )
+target_link_libraries ( generic json agent ${Boost_LIBRARIES} pthread )
 

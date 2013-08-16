@@ -37,7 +37,7 @@ void tube_head_getter::async_head(json::var_t const &desc,
                             agent_arg::response,
                             agent_arg::buffer, 
                             handler,
-                            desc));
+                            boost::cref(desc)));
 }
 
 bool tube_head_getter::validate_desc(json::var_t const &desc)
@@ -68,13 +68,11 @@ void tube_head_getter::handle_page(boost::system::error_code const &ec,
       if(tube::get_link(buffer, itag, url, signature)) {
         http::entity::url video_url;
         http::request req;
-        std::stringstream cvt;
 
         url.append("%26signature%3D").append(signature);
         auto beg(url.begin()), end(url.end());
         http::parser::parse_url_esc_string(beg, end, video_url);
-        cvt << "bytes=0-31";
-        req.headers << field("Range", cvt.str());
+        req.headers << field("Range", "bytes=0-31");
         http::get_header(req.headers, "Connection")->value = "close";
         async_request(video_url, req, "GET", false,
                       boost::bind(
@@ -82,8 +80,7 @@ void tube_head_getter::handle_page(boost::system::error_code const &ec,
                         agent_arg::error, 
                         agent_arg::response,
                         agent_arg::buffer,
-                        handler,
-                        desc));
+                        handler));
       } else { // get link failure
         json::var_t dummy;
         error_code invalid_arg(errc::invalid_argument, system_category());
@@ -103,8 +100,7 @@ void tube_head_getter::handle_page(boost::system::error_code const &ec,
 void tube_head_getter::handle_content_head(boost::system::error_code const &ec,
                                            http::response const &resp,
                                            boost::asio::const_buffer buffer,
-                                           head_handler_type handler,
-                                           json::var_t const &desc)
+                                           head_handler_type handler)
 {
   using boost::lexical_cast;
   json::var_t rt;

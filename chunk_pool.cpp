@@ -228,5 +228,5 @@ bool chunk_pool::flush_then_next()
 
 size_t chunk_pool::chunk_size()
 {
-  return ipc::mapped_region::get_page_size() << 9;
+  return ipc::mapped_region::get_page_size() << 8;
 }

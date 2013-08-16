@@ -57,8 +57,7 @@ private:
   void handle_content_head(boost::system::error_code const &ec,
                            http::response const &resp,
                            boost::asio::const_buffer buffer,
-                           head_handler_type handler,
-                           json::var_t const &desc);
+                           head_handler_type handler);
 };
 
 #endif
