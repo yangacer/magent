@@ -9,10 +9,12 @@
 chunk_pool::chunk_pool(
   json::var_t &obj_desc,
   size_t max_conn, 
-  size_t max_conn_per_peer)
+  size_t max_conn_per_peer,
+  boost::intmax_t retry_limit)
 : obj_desc_(obj_desc), 
   max_connection_(max_conn),
   max_connection_per_peer_(max_conn_per_peer),
+  retry_limit_(retry_limit),
   running_agent_(0),
   cur_seg_(0)
 {
@@ -74,11 +76,20 @@ bool chunk_pool::acquire_peer(std::string &peer)
   return false;
 }
 
-void chunk_pool::release_peer(std::string const &peer)
+void chunk_pool::release_peer(std::string const &peer, bool failure)
 {
-  assert(running_cnt_.count(peer));
+  if(0 == running_cnt_.count(peer)) return;
   running_cnt_[peer]--;
   running_agent_--;
+  if(failure) {
+    auto &failure_cnt = 
+      mbof(obj_desc_)["peer_failure"][peer.c_str()].test(boost::intmax_t(0));
+    failure_cnt++;
+    if(failure_cnt > retry_limit_) {
+      mbof(obj_desc_)["sources"].object().erase(peer);
+      running_cnt_.erase(peer);
+    }
+  }
 }
 
 boost::intmax_t chunk_pool::segment_size(bitset_t::size_type seg_off) const
@@ -163,7 +174,7 @@ void chunk_pool::abort_chunk(std::string const &peer, chunk chk)
 {
   auto chk_byte_off = (chk.offset - segment_offset(cur_seg_))/chunk_pool::chunk_size();
   chk_acquired_[chk_byte_off] = false;
-  release_peer(peer);
+  release_peer(peer, true);
 }
 
 std::ostream &operator << (std::ostream &os, chunk_pool const &chkp)
@@ -228,5 +239,5 @@ bool chunk_pool::flush_then_next()
 
 size_t chunk_pool::chunk_size()
 {
-  return ipc::mapped_region::get_page_size() << 8;
+  return ipc::mapped_region::get_page_size() << 9;
 }

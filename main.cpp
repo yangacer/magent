@@ -82,7 +82,7 @@ magent::magent(int argc, char**argv)
   po::store(po::parse_command_line(argc, argv, opts), vm_); 
   po::notify(vm_);
   
-  if(vm_.count("help")) { cout << opts << "\n"; return; }
+  if(argc == 1 || vm_.count("help")) { cout << opts << "\n"; return; }
 
   if(obj_desc_str.empty())
     throw invalid_argument("Miss obj-desc argument");
@@ -196,7 +196,8 @@ void magent::prepare()
   chunk_pool_ptr_.reset(
     new chunk_pool(obj_desc_, 
                    vm_["max-connection"].as<size_t>(),
-                   vm_["max-conn-per-peer"].as<size_t>()))
+                   vm_["max-conn-per-peer"].as<size_t>(),
+                   vm_["retry-limit"].as<boost::intmax_t>()))
     ;
   auto concurrency = chunk_pool_ptr_->estimate_concurrency();
   mbof(obj_desc_)["debug"]["concurrency"] = (boost::intmax_t)concurrency;
@@ -280,16 +281,11 @@ void magent::handle_data(boost::system::error_code const &ec,
                          std::string const &peer, 
                          chunk_pool::chunk chk)
 {
+  // std::cout << "chk ack: " << chk.offset  <<"\n";
   if(!ec) {
     chunk_pool_ptr_->put_chunk(peer, chk);
   } else {
     chunk_pool_ptr_->abort_chunk(peer, chk);
-    auto &failure_cnt = 
-      mbof(obj_desc_)["peer_failure"][peer.c_str()].test(boost::intmax_t(0));
-    failure_cnt++;
-    if(failure_cnt > vm_["retry-limit"].as<boost::intmax_t>()) {
-      mbof(obj_desc_)["sources"].object().erase(peer);
-    }
   }
   if(chunk_pool_ptr_->is_complete()) {
     heart_beat(false);

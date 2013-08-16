@@ -33,7 +33,8 @@ public:
 
   chunk_pool(json::var_t &obj_desc,
              size_t max_conn = 0, 
-             size_t max_conn_per_peer = 0);
+             size_t max_conn_per_peer = 0,
+             boost::intmax_t retry_limit = 2);
   ~chunk_pool();
   /** Get first neigher acquired nor committed chunk from a prefered peer.
    *  
@@ -64,7 +65,7 @@ public:
 #endif
 protected:
   bool acquire_peer(std::string &peer);
-  void release_peer(std::string const &peer);
+  void release_peer(std::string const &peer, bool failure = false);
   boost::intmax_t segment_size(bitset_t::size_type seg_off) const;
   boost::intmax_t segment_offset(bitset_t::size_type seg_off) const;
 private:
@@ -72,6 +73,7 @@ private:
   size_t max_connection_;
   size_t max_connection_per_peer_;
   size_t running_agent_;
+  boost::intmax_t retry_limit_;
   ipc::file_mapping mf_;
   ipc::mapped_region mr_;
   bitset_t seg_stored_;
