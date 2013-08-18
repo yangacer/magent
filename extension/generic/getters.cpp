@@ -109,7 +109,7 @@ void generic_data_getter::async_get(json::var_t const &desc,
 
   peer_ = peer;
   chunk_ = chk;
-
+  buffer_consumed_ = 0;
   auto bufsize = boost::asio::buffer_size(chunk_.buffer);
   assert(bufsize > 0);
   cvt << "bytes=" <<  
@@ -117,7 +117,7 @@ void generic_data_getter::async_get(json::var_t const &desc,
     (chunk_.offset + bufsize -1)
     ;
   req.headers << field("Range", cvt.str());
-  http::get_header(req.headers, "Connection")->value = "close";
+  // http::get_header(req.headers, "Connection")->value = "close";
   async_request(peer, req, "GET", true,
                 boost::bind(&generic_data_getter::handle_content, shared_from_this(),
                             agent_arg::error,

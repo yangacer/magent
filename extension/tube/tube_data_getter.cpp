@@ -24,6 +24,7 @@ void tube_data_getter::async_get(json::var_t const &desc,
     return;
   }
   */
+  buffer_consumed_ = 0;
   chunk_ = chk;
   if( peer == page_url_ ) {
     get_video(handler, desc);
