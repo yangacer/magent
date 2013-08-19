@@ -18,10 +18,10 @@ namespace json = yangacer::json;
 
 class magent
 {
-  typedef boost::shared_ptr<head_getter> head_getter_ptr_type;
-  typedef boost::shared_ptr<data_getter> data_getter_ptr_type;
-  typedef boost::shared_ptr<chunk_pool> chunk_pool_ptr_type;
-  typedef std::vector<boost::shared_ptr<data_getter> > data_getter_array_type;
+  typedef boost::shared_ptr<head_getter>  head_getter_ptr_type;
+  typedef boost::shared_ptr<data_getter>  data_getter_ptr_type;
+  typedef boost::weak_ptr<data_getter>    data_getter_weak_type;
+  typedef boost::shared_ptr<chunk_pool>   chunk_pool_ptr_type;
   typedef chunk_pool::chunk chunk;
 public:
   magent(int argc, char **argv);
@@ -40,10 +40,11 @@ protected:
                          boost::shared_ptr<std::string> body,
                          boost::shared_ptr<agent_v2>,
                          bool persistent);
-  void dispatch_agent(std::string peer = "");
+  void dispatch_agent(std::string peer = "", data_getter_weak_type wptr = data_getter_weak_type());
   void handle_data(boost::system::error_code const &ec, 
                    std::string const &peer, 
-                   chunk_pool::chunk chk);
+                   chunk_pool::chunk chk,
+                   data_getter_weak_type wptr);
 private:
   boost::asio::io_service ios_;
   boost::program_options::variables_map vm_;
@@ -255,7 +256,7 @@ void magent::handle_heart_beat(boost::system::error_code const &ec,
   }
 }
 
-void magent::dispatch_agent(std::string peer)
+void magent::dispatch_agent(std::string peer, data_getter_weak_type wptr)
 {
   auto sources = cmbof(obj_desc_)["sources"].object();
   while(sources.size() && 
@@ -265,11 +266,12 @@ void magent::dispatch_agent(std::string peer)
     std::string const &content_type = cmbof(obj_desc_)["content_type"].string();
     chunk chk = chunk_pool_ptr_->get_chunk(peer);
     if(!chk) break;
-    data_getter_ptr_type dg =
-      extloader_.create_data_getter(ios_, content_type.c_str(), peer);
+    data_getter_ptr_type dg = wptr.lock();
+    if(!dg) dg = extloader_.create_data_getter(ios_, content_type.c_str(), peer);
     if(dg) {
       dg->async_get(obj_desc_, peer, chk,
-                    boost::bind(&magent::handle_data, this, _1, _2, _3));
+                    boost::bind(&magent::handle_data, this, _1, _2, _3, dg));
+      wptr.reset();
     } else {
       chunk_pool_ptr_->abort_chunk(peer, chk);
       logger::instance().async_log("warning", false, "No supported head getter found");
@@ -279,7 +281,8 @@ void magent::dispatch_agent(std::string peer)
 
 void magent::handle_data(boost::system::error_code const &ec, 
                          std::string const &peer, 
-                         chunk_pool::chunk chk)
+                         chunk_pool::chunk chk,
+                         data_getter_weak_type wptr)
 {
   // std::cout << "chk ack: " << chk.offset  <<"\n";
   if(!ec) {
@@ -289,13 +292,14 @@ void magent::handle_data(boost::system::error_code const &ec,
   }
   if(chunk_pool_ptr_->is_complete()) {
     heart_beat(false);
-    if(chunk_pool_ptr_->flush_then_next())
-      dispatch_agent(peer);
-    else
+    if(chunk_pool_ptr_->flush_then_next()) 
+      dispatch_agent(peer, wptr);
+    else {
+      json::pretty_print(std::cout, obj_desc_); //, json::print::compact);
       ios_.stop();
-    json::pretty_print(std::cout, obj_desc_); //, json::print::compact);
+    }
   } else {
-    dispatch_agent(peer);
+    dispatch_agent(peer, wptr);
   }
   //std::cout << std::endl;
 }

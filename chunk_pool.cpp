@@ -65,13 +65,16 @@ bool chunk_pool::acquire_peer(std::string &peer)
     running_agent_++;
     return true;
   }
+  auto min_iter = running_cnt_.begin();
   for(auto i=running_cnt_.begin(); i != running_cnt_.end(); ++i) {
-    if(i->second < max_connection_per_peer_ ) {
-      peer = i->first;
-      i->second++;
-      running_agent_++;
-      return true;
-    }
+    if(i->second < min_iter->second )
+      min_iter = i;
+  }
+  if( min_iter->second < max_connection_per_peer_ ) {
+    peer = min_iter->first;
+    min_iter->second++;
+    running_agent_++;
+    return true;
   }
   return false;
 }
